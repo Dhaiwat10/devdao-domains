@@ -2,66 +2,46 @@ import * as React from 'react';
 import type { AppProps } from 'next/app';
 import NextHead from 'next/head';
 import '../styles/globals.css';
-
-// Imports
-import { Provider, chain, createClient, defaultChains } from 'wagmi';
-import { InjectedConnector } from 'wagmi/connectors/injected';
-import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
-import { CoinbaseWalletConnector } from 'wagmi/connectors/coinbaseWallet';
-
 import { useIsMounted } from '../hooks';
 
-// Get environment variables
-const alchemyId = process.env.NEXT_PUBLIC_ALCHEMY_ID as string;
-// const infuraId = process.env.NEXT_PUBLIC_INFURA_ID as string;
+import '@rainbow-me/rainbowkit/styles.css';
 
-// Pick chains
-const chains = defaultChains;
-const defaultChain = chain.mainnet;
+import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
+import { chain, configureChains, createClient, WagmiConfig } from 'wagmi';
+import { alchemyProvider } from 'wagmi/providers/alchemy';
+import { publicProvider } from 'wagmi/providers/public';
 
-// Set up connectors
-const client = createClient({
+const { chains, provider } = configureChains(
+  [chain.hardhat],
+  [alchemyProvider({ apiKey: process.env.ALCHEMY_ID }), publicProvider()]
+);
+
+const { connectors } = getDefaultWallets({
+  appName: 'My RainbowKit App',
+  chains,
+});
+
+const wagmiClient = createClient({
   autoConnect: true,
-  connectors({ chainId }) {
-    const chain = chains.find((x) => x.id === chainId) ?? defaultChain;
-    const rpcUrl = chain.rpcUrls.alchemy
-      ? `${chain.rpcUrls.alchemy}/${alchemyId}`
-      : typeof chain.rpcUrls.default === 'string'
-      ? chain.rpcUrls.default
-      : chain.rpcUrls.default[0];
-    return [
-      new InjectedConnector(),
-      new CoinbaseWalletConnector({
-        options: {
-          appName: 'create-web3',
-          chainId: chain.id,
-          jsonRpcUrl: rpcUrl,
-        },
-      }),
-      new WalletConnectConnector({
-        options: {
-          qrcode: true,
-          rpc: {
-            [chain.id]: rpcUrl,
-          },
-        },
-      }),
-    ];
-  },
+  connectors,
+  provider,
 });
 
 const App = ({ Component, pageProps }: AppProps) => {
   const isMounted = useIsMounted();
 
   if (!isMounted) return null;
-  return (
-    <Provider client={client}>
-      <NextHead>
-        <title>create-web3</title>
-      </NextHead>
 
-      <Component {...pageProps} />
-    </Provider>
+  return (
+    <WagmiConfig client={wagmiClient}>
+      <RainbowKitProvider chains={chains}>
+        <NextHead>
+          <title>create-web3</title>
+        </NextHead>
+
+        <Component {...pageProps} />
+      </RainbowKitProvider>
+    </WagmiConfig>
   );
 };
 
